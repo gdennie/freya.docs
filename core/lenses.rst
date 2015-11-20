@@ -10,9 +10,13 @@ With that in mind, we base our approach on *lenses*.
 Lenses
 ------
 
-Lenses are a functional technique to enable us to work with complex data structures more easily. As data structures are generally immutable, modifying a data structure (or returning a new instance with the changes reflected) can be quite onerous if the data structure is large and complex, and the area we wish to change is deep within the data structure.
+Lenses are a functional technique to enable us to work with complex data structures more easily. As data structures are generally complex, accessing or modifying parts of them can be quite onerous especially when the area we wish to change is deep within the structure or the data is in another format or type.
 
-Lenses, as their name implies, enable us to *focus* on a particular part of a data structure, treating it as if it were a normal top level instance of some data. We can think of doing our work *through a lens*, which will handle the mechanics (or optics, perhaps) of data structure modification for us.
+Lenses, as their name implies, enable us to view a data structure in a more convenient way (called Isomorphic transform). In particular, we are able to devise specific lense to view specific properties of target data structures so as to expose values as though they are top level properties of a particular type. We can then proceed with our work *through a lens*, which then handles the mechanics (or optics, perhaps) of data structure modification and type conversion for us.
+
+A Lense is a tuple of two functions, `type Lens = ('target -> 'value) * ('value -> 'target -> 'target)`, implemented for a particular data structure, `'target`, and an implied property of type `'value`. The particular property of a data structure a lense refers to is normally identified by giving the lense implementation the same name as the property suffixed by with an underscore as in lense to `PropertyA` would be named `PropertyA_`.
+
+Apart from flipping the data structure around isomorphically to expose properties in a particular type, lense are designed to be composable with the aide of provided particular operators. Consequently, a lense over a path string exposing it's inner elements may consist of first of a lenses that views the path as an array of segments instead of a contiguous string with embedded segment separators. Each segment may in turn be read or edited by another lense that performs whatever transformation or validation is appropriate for a segment such as if segments must in fact be a positive integer.
 
 Aether
 ^^^^^^
