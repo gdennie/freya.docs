@@ -66,54 +66,35 @@ Simple Static File Server
     open Microsoft.Owin.Hosting
     open System.IO
     open System
-
-    //System.IO.Path.PathCombine is a bit weird
-    let pathCombine a b =
-      let rt = 
-        if String.IsNullOrWhiteSpace a then 0
-        elif a.EndsWith(string Path.DirectorySeparatorChar) then 1
-        elif a.EndsWith(string Path.VolumeSeparatorChar) then 2
-        else 3
-      let fn = 
-        if String.IsNullOrWhiteSpace b then 0
-        elif b.StartsWith(string Path.DirectorySeparatorChar) then 1
-        else 3
-      match rt, fn with
-      | 0, 0 -> ""
-      | 0, _ -> b
-      | _, 0 -> a
-      | 1, 1 -> a + b.Substring(1)
-      | 3, 3 -> a + (string Path.DirectorySeparatorChar) + b
-      | _    -> a + b
+    open Freya.Lenses.Http
 
     let fileServer root = freya {
-      let! state = Freya.State.get
-      let reqPath = state.Environment.["owin.RequestPath"]:?> String
-      let path = 
-        match state.Environment.["owin.RequestPath"] with
-        | :? string as p when p <> "" && p <> "/" -> pathCombine root p
-        | _                                       -> pathCombine root "index.html"
+      let! reqPath = Freya.Lens.get Request.Path_      
+      let path =
+        let relPath = reqPath.Substring(Path.GetPathRoot(reqPath).Length).TrimStart() 
+        match relPath with
+        | ""  -> Path.Combine(root, "index.html")
+        | q   -> Path.Combine(root, q)
       let (code, phrase, bytes) =
         try
           match File.Exists path with
           | true  -> (200, "OK"                     , File.ReadAllBytes(path))
-          | _     -> (404, "File Not Found - "      , [||])
+          | _     -> (404, "File Not Found"         , [||])
         with _    -> (501, "Internal Server Error"  , [||] )
-      state.Environment.["owin.ResponseStatusCode"] <- code
-      state.Environment.["owin.ResponseReasonPhrase"] <- phrase
-      state.Environment.["owin.ResponseBody"] :?> Stream
-        |> fun s -> s.Write(bytes, 0, bytes.Length)
+      do! Freya.Lens.setPartial Response.StatusCode_ code
+      do! Freya.Lens.setPartial Response.ReasonPhrase_ phrase
+      do! Freya.Lens.map Response.Body_ (fun s -> s.Write(bytes, 0, bytes.Length); s)
       }
 
-    type Exercise() =
-        member __.Configuration() =
-            OwinAppFunc.ofFreya (fileServer @"C:\documents\myWebsiteStaticContentRoot\")
+    type Startup() =
+      member __.Configuration() =
+        OwinAppFunc.ofFreya (fileServer @"C:\MyWebSite\StaticContent\")
 
     [<EntryPoint>]
     let main _ =
       try
         let url = "http://localhost:8080"
-        let _ = WebApp.Start<Exercise> (url)
+        let _ = WebApp.Start<Startup> (url)
         [ 
           "Serving site at " + url
           "Press ENTER to cancel"
@@ -121,8 +102,10 @@ Simple Static File Server
         let _ = Console.ReadLine()
         0
       with x ->
-        Console.WriteLine()
-        Console.WriteLine x.Message
-        Console.WriteLine()
+        [
+          "\n"
+          x.Message
+          "\n"
+        ] |> List.iter Console.WriteLine
         let _ = Console.ReadLine()
         1
